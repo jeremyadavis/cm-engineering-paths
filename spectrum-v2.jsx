@@ -236,21 +236,38 @@ export default function CareerSpectrum() {
   const [selected, setSelected] = useState(null);
   const [hovered, setHovered] = useState(null);
   const [selectedTrack, setSelectedTrack] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
   const containerRef = useRef(null);
+  const svgContainerRef = useRef(null);
   const [W, setW] = useState(960);
 
   useEffect(() => {
     const measure = () => {
-      if (containerRef.current) {
+      if (isFullscreen) {
+        setW(Math.max(740, window.innerWidth - 80));
+      } else if (containerRef.current) {
         setW(Math.max(740, Math.min(1060, containerRef.current.clientWidth)));
       }
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, []);
+  }, [isFullscreen]);
 
-  const H = 580;
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") {
+        if (isFullscreen) setIsFullscreen(false);
+        else if (selected) setSelected(null);
+        else if (selectedTrack) setSelectedTrack(null);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isFullscreen, selected, selectedTrack]);
+
+  const H = isFullscreen ? Math.max(500, window.innerHeight - 120) : 580;
   const midY = H * 0.28;
   const branchSpacing = 55;
   const phaseXPositions = PHASES.map((p) => W * p.x);
@@ -360,13 +377,138 @@ export default function CareerSpectrum() {
 
   const isEarlyCareer = (node) => node.phase <= SENIOR_PHASE && node.branch === "ic";
 
+  const handleNodeHover = (node, e) => {
+    setSelected(node.id);
+    setSelectedTrack(null);
+    setHovered(node.id);
+    if (svgContainerRef.current && e) {
+      const rect = svgContainerRef.current.getBoundingClientRect();
+      const pos = getNodePos(node);
+      const scaleX = rect.width / W;
+      const scaleY = rect.height / H;
+      setModalPos({
+        x: rect.left + pos.x * scaleX,
+        y: rect.top + pos.y * scaleY,
+      });
+    }
+  };
+
+  const handleNodeLeave = () => {
+    setSelected(null);
+    setHovered(null);
+  };
+
+  const handleTrackHover = (track, e) => {
+    setSelectedTrack(track.id);
+    setSelected(null);
+    setHovered(`track-${track.id}`);
+    if (svgContainerRef.current && e) {
+      const rect = svgContainerRef.current.getBoundingClientRect();
+      const pos = track.id === "staff" ? trackData.staffPos : trackData.emPos;
+      const scaleX = rect.width / W;
+      const scaleY = rect.height / H;
+      setModalPos({
+        x: rect.left + pos.x * scaleX,
+        y: rect.top + pos.y * scaleY,
+      });
+    }
+  };
+
+  const handleTrackLeave = () => {
+    setSelectedTrack(null);
+    setHovered(null);
+  };
+
+  // Modal component for node/track details
+  const DetailModal = ({ data, type, onClose }) => {
+    if (!data) return null;
+
+    const isNode = type === "node";
+    const color = isNode ? BRANCH_META[data.branch].color : data.color;
+    const icon = isNode ? BRANCH_META[data.branch].icon : null;
+    const label = isNode
+      ? `${BRANCH_META[data.branch].label} · ${PHASES[data.phase].sublabel}`
+      : "Distinct Track";
+
+    // Calculate modal position - position near the clicked element
+    const modalStyle = {
+      position: "fixed",
+      left: Math.min(modalPos.x + 20, window.innerWidth - 420),
+      top: Math.max(20, Math.min(modalPos.y - 100, window.innerHeight - 400)),
+      width: 380,
+      maxHeight: "calc(100vh - 40px)",
+      overflowY: "auto",
+      background: COLORS.surface,
+      border: `1px solid ${color}40`,
+      borderRadius: 12,
+      padding: "20px 24px",
+      boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
+      zIndex: 1000,
+    };
+
+    return (
+      <div
+        style={modalStyle}
+        onMouseEnter={() => {
+          // Keep modal open when hovering over it
+        }}
+        onMouseLeave={onClose}
+      >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            {icon && <span style={{ color, fontSize: 10 }}>{icon}</span>}
+            <span
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              {label}
+            </span>
+          </div>
+          <h3 style={{ color: COLORS.textPrimary, fontSize: 18, fontWeight: 600, margin: "0 0 12px 0" }}>
+            {isNode ? data.title : data.label}
+          </h3>
+          {!isNode && (
+            <p style={{ color: COLORS.textMuted, fontSize: 11, margin: "0 0 12px 0", fontFamily: "'JetBrains Mono', monospace" }}>
+              Primarily draws from: {data.fromBranches.map((b) => BRANCH_META[b].label).join(", ")}
+            </p>
+          )}
+          {data.items.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+              <div
+                style={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  background: color,
+                  marginTop: 7,
+                  flexShrink: 0,
+                  opacity: 0.6,
+                }}
+              />
+              <span style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+            </div>
+          ))}
+      </div>
+    );
+  };
+
   return (
     <div
       style={{
         background: COLORS.bg,
         minHeight: "100vh",
-        padding: "32px 20px",
+        padding: isFullscreen ? "20px" : "32px 20px",
         fontFamily: "'DM Sans', sans-serif",
+        ...(isFullscreen && {
+          position: "fixed",
+          inset: 0,
+          zIndex: 100,
+          overflow: "auto",
+        }),
       }}
     >
       <link
@@ -374,72 +516,142 @@ export default function CareerSpectrum() {
         rel="stylesheet"
       />
 
-      <div ref={containerRef} style={{ maxWidth: 1060, margin: "0 auto" }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1
-            style={{
-              color: COLORS.textPrimary,
-              fontSize: 26,
-              fontWeight: 700,
-              margin: "0 0 6px 0",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Engineering Career Spectrum
-          </h1>
-          <p
-            style={{
-              color: COLORS.textSecondary,
-              fontSize: 14,
-              margin: 0,
-              lineHeight: 1.5,
-            }}
-          >
-            From junior through senior, additional responsibilities emerge and
-            branch toward Staff or EM. Click any node to explore.
-          </p>
-        </div>
+      {/* Modal for node/track details */}
+      {selectedNode && (
+        <DetailModal data={selectedNode} type="node" onClose={() => setSelected(null)} />
+      )}
+      {selectedTrackData && (
+        <DetailModal data={selectedTrackData} type="track" onClose={() => setSelectedTrack(null)} />
+      )}
 
-        {/* Legend */}
+      <div ref={containerRef} style={{ maxWidth: isFullscreen ? "none" : 1060, margin: "0 auto", padding: isFullscreen ? "0 20px" : 0 }}>
+        {!isFullscreen && (
+          <div style={{ marginBottom: 28 }}>
+            <h1
+              style={{
+                color: COLORS.textPrimary,
+                fontSize: 26,
+                fontWeight: 700,
+                margin: "0 0 6px 0",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Engineering Career Spectrum
+            </h1>
+            <p
+              style={{
+                color: COLORS.textSecondary,
+                fontSize: 14,
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              From junior through senior, additional responsibilities emerge and
+              branch toward Staff or EM. Hover over any node to explore.
+            </p>
+          </div>
+        )}
+
+        {/* Legend and controls */}
         <div
           style={{
             display: "flex",
             gap: 16,
             marginBottom: 16,
             flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          {BRANCH_ORDER.map((b) => (
-            <div
-              key={b}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <span style={{ color: BRANCH_META[b].color, fontSize: 10 }}>
-                {BRANCH_META[b].icon}
-              </span>
-              <span
-                style={{
-                  color: COLORS.textMuted,
-                  fontSize: 11,
-                  fontFamily: "'JetBrains Mono', monospace",
-                }}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            {BRANCH_ORDER.map((b) => (
+              <div
+                key={b}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
               >
-                {BRANCH_META[b].label}
-              </span>
+                <span style={{ color: BRANCH_META[b].color, fontSize: 10 }}>
+                  {BRANCH_META[b].icon}
+                </span>
+                <span
+                  style={{
+                    color: COLORS.textMuted,
+                    fontSize: 11,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {BRANCH_META[b].label}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 16, height: 2, background: COLORS.staff, borderRadius: 1 }} />
+              <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>→ Staff</span>
             </div>
-          ))}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 16, height: 2, background: COLORS.staff, borderRadius: 1 }} />
-            <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>→ Staff</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 16, height: 2, background: COLORS.em, borderRadius: 1 }} />
+              <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>→ EM</span>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 16, height: 2, background: COLORS.em, borderRadius: 1 }} />
-            <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>→ EM</span>
-          </div>
+          {/* Fullscreen toggle button */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              background: COLORS.surfaceHover,
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: 6,
+              color: COLORS.textSecondary,
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = COLORS.border;
+              e.currentTarget.style.color = COLORS.textPrimary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = COLORS.surfaceHover;
+              e.currentTarget.style.color = COLORS.textSecondary;
+            }}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {isFullscreen ? (
+                <>
+                  <polyline points="4 14 10 14 10 20" />
+                  <polyline points="20 10 14 10 14 4" />
+                  <line x1="14" y1="10" x2="21" y2="3" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </>
+              ) : (
+                <>
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </>
+              )}
+            </svg>
+            {isFullscreen ? "Exit" : "Expand"}
+          </button>
         </div>
 
         {/* SVG */}
         <div
+          ref={svgContainerRef}
           style={{
             background: COLORS.surface,
             borderRadius: 12,
@@ -562,9 +774,8 @@ export default function CareerSpectrum() {
                 <g
                   key={track.id}
                   style={{ cursor: "pointer" }}
-                  onClick={() => { setSelectedTrack(isActive ? null : track.id); setSelected(null); }}
-                  onMouseEnter={() => setHovered(`track-${track.id}`)}
-                  onMouseLeave={() => setHovered(null)}
+                  onMouseEnter={(e) => handleTrackHover(track, e)}
+                  onMouseLeave={handleTrackLeave}
                 >
                   {(isActive || hovered === `track-${track.id}`) && (
                     <circle cx={pos.x} cy={pos.y} r={22} fill={track.color} opacity={0.12} filter="url(#nodeGlow)" />
@@ -599,9 +810,8 @@ export default function CareerSpectrum() {
                 <g
                   key={node.id}
                   style={{ cursor: "pointer" }}
-                  onClick={() => { setSelected(selected === node.id ? null : node.id); setSelectedTrack(null); }}
-                  onMouseEnter={() => setHovered(node.id)}
-                  onMouseLeave={() => setHovered(null)}
+                  onMouseEnter={(e) => handleNodeHover(node, e)}
+                  onMouseLeave={handleNodeLeave}
                 >
                   {isActive && (
                     <circle cx={pos.x} cy={pos.y} r={18} fill={meta.color} opacity={0.15} filter="url(#nodeGlow)" />
@@ -645,96 +855,14 @@ export default function CareerSpectrum() {
           </svg>
         </div>
 
-        {/* Detail Panel */}
-        {selectedNode && (
-          <div
-            style={{
-              background: COLORS.surface,
-              border: `1px solid ${BRANCH_META[selectedNode.branch].color}30`,
-              borderRadius: 12,
-              padding: "24px 28px",
-              marginTop: 20,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-              position: "relative",
-            }}
-          >
-            <button
-              onClick={() => setSelected(null)}
-              style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: COLORS.textMuted, fontSize: 16, cursor: "pointer", padding: "4px 8px" }}
-            >
-              ✕
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ color: BRANCH_META[selectedNode.branch].color, fontSize: 10 }}>
-                {BRANCH_META[selectedNode.branch].icon}
-              </span>
-              <span
-                style={{
-                  fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em",
-                  color: BRANCH_META[selectedNode.branch].color,
-                  fontFamily: "'JetBrains Mono', monospace",
-                }}
-              >
-                {BRANCH_META[selectedNode.branch].label} · {PHASES[selectedNode.phase].sublabel}
-              </span>
-            </div>
-            <h3 style={{ color: COLORS.textPrimary, fontSize: 20, fontWeight: 600, margin: "0 0 16px 0" }}>
-              {selectedNode.title}
-            </h3>
-            {selectedNode.items.map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 7 }}>
-                <div style={{ width: 4, height: 4, borderRadius: "50%", background: BRANCH_META[selectedNode.branch].color, marginTop: 7, flexShrink: 0, opacity: 0.6 }} />
-                <span style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.55 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {selectedTrackData && (
-          <div
-            style={{
-              background: COLORS.surface,
-              border: `1px solid ${selectedTrackData.color}30`,
-              borderRadius: 12,
-              padding: "24px 28px",
-              marginTop: 20,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-              position: "relative",
-            }}
-          >
-            <button
-              onClick={() => setSelectedTrack(null)}
-              style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: COLORS.textMuted, fontSize: 16, cursor: "pointer", padding: "4px 8px" }}
-            >
-              ✕
-            </button>
-            <div style={{ marginBottom: 4 }}>
-              <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: selectedTrackData.color, fontFamily: "'JetBrains Mono', monospace" }}>
-                Distinct Track
-              </span>
-            </div>
-            <h3 style={{ color: COLORS.textPrimary, fontSize: 20, fontWeight: 600, margin: "0 0 6px 0" }}>
-              {selectedTrackData.label}
-            </h3>
-            <p style={{ color: COLORS.textMuted, fontSize: 12, margin: "0 0 16px 0", fontFamily: "'JetBrains Mono', monospace" }}>
-              Primarily draws from: {selectedTrackData.fromBranches.map((b) => BRANCH_META[b].label).join(", ")}
-            </p>
-            {selectedTrackData.items.map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 7 }}>
-                <div style={{ width: 4, height: 4, borderRadius: "50%", background: selectedTrackData.color, marginTop: 7, flexShrink: 0, opacity: 0.6 }} />
-                <span style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.55 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!selectedNode && !selectedTrackData && (
+        {!isFullscreen && !selectedNode && !selectedTrackData && (
           <div style={{ textAlign: "center", padding: "20px 0 4px", color: COLORS.textMuted, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-            ↑ Click any node or endpoint to see responsibilities
+            Hover over any node to see details · Press Expand for fullscreen view
           </div>
         )}
 
         {/* How it works */}
+        {!isFullscreen && (
         <div
           style={{
             marginTop: 28,
@@ -769,6 +897,7 @@ export default function CareerSpectrum() {
             people + process at team scope).
           </p>
         </div>
+        )}
       </div>
     </div>
   );
