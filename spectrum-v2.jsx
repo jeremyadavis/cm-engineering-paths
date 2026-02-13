@@ -235,9 +235,11 @@ const BRANCH_Y_OFFSETS = {
 /* ── Current-State data ────────────────────────────────── */
 
 const CURRENT_PHASES = [
-  { id: "c0", x: 0.12, label: "Junior", sublabel: "Learning & Growing" },
-  { id: "c1", x: 0.35, label: "Mid-Level", sublabel: "Reliable Contributor" },
-  { id: "c2", x: 0.58, label: "Senior", sublabel: "Experienced IC" },
+  { id: "c0", x: 0.08, label: "Junior", sublabel: "Learning & Growing" },
+  { id: "c1", x: 0.24, label: "Mid-Level", sublabel: "Reliable Contributor" },
+  { id: "c2", x: 0.42, label: "Senior", sublabel: "Experienced IC" },
+  { id: "c3", x: 0.62, label: "Staff", sublabel: "Technical Leadership" },
+  { id: "c4", x: 0.82, label: "Principal", sublabel: "Org-wide Impact" },
 ];
 
 const CURRENT_NODES = [
@@ -272,6 +274,28 @@ const CURRENT_NODES = [
       "Maintains quality standards for their area",
       "Debugs and resolves production issues independently",
       "Makes sound technical choices within their feature scope",
+    ],
+  },
+  {
+    id: "cur-staff", phase: 3,
+    title: "Staff Engineer",
+    items: [
+      "Drives technical direction across multiple teams",
+      "Owns complex cross-cutting technical initiatives",
+      "Mentors and grows senior engineers",
+      "Makes architectural decisions with org-wide impact",
+      "Balances technical excellence with business needs",
+    ],
+  },
+  {
+    id: "cur-principal", phase: 4,
+    title: "Principal Engineer",
+    items: [
+      "Sets technical vision and strategy for the organization",
+      "Solves the hardest, most ambiguous technical problems",
+      "Influences engineering culture and practices company-wide",
+      "Partners with leadership on technology decisions",
+      "Recognized as a technical authority internally and externally",
     ],
   },
 ];
@@ -1092,16 +1116,17 @@ export default function CareerSpectrum() {
           {/* Current State SVG */}
           {(() => {
             const curH = isFullscreen ? Math.max(400, window.innerHeight - 120) : 420;
-            const curMidY = curH * 0.5;
+            const curMidY = curH * 0.55;
+            const tlY = curH * 0.32; // Tech Lead line above main track
             const curPhaseX = CURRENT_PHASES.map((p) => W * p.x);
-            const tlX = W * 0.82;
-            const tlY = curH * 0.22;
+
+            // Tech Lead line starts well into Senior (not right away) and goes through to Principal
+            const tlStartX = curPhaseX[2] + (curPhaseX[3] - curPhaseX[2]) * 0.4; // 40% of the way from Senior to Staff
+            const tlEndX = curPhaseX[4] + 40; // Extends past Principal
 
             // Build paths
-            const levelPath = `M ${curPhaseX[0]} ${curMidY} L ${curPhaseX[1]} ${curMidY} L ${curPhaseX[2]} ${curMidY}`;
-            const seniorX = curPhaseX[2];
-            const cpX = seniorX + (tlX - seniorX) * 0.5;
-            const tlPath = `M ${seniorX} ${curMidY} C ${cpX} ${curMidY}, ${cpX} ${tlY}, ${tlX} ${tlY}`;
+            const levelPath = `M ${curPhaseX[0]} ${curMidY} L ${curPhaseX[4]} ${curMidY}`;
+            const tlPath = `M ${tlStartX} ${tlY} L ${tlEndX} ${tlY}`;
 
             const handleCurrentNodeHover = (node, e) => {
               setSelected(node.id);
@@ -1125,7 +1150,9 @@ export default function CareerSpectrum() {
                 const rect = svgContainerRef.current.getBoundingClientRect();
                 const scaleX = rect.width / W;
                 const scaleY = rect.height / curH;
-                setModalPos({ x: rect.left + tlX * scaleX, y: rect.top + tlY * scaleY });
+                // Position modal near the middle of the TL line
+                const tlMidX = (tlStartX + tlEndX) / 2;
+                setModalPos({ x: rect.left + tlMidX * scaleX, y: rect.top + tlY * scaleY });
               }
             };
 
@@ -1201,37 +1228,7 @@ export default function CareerSpectrum() {
                     );
                   })}
 
-                  {/* Tech Lead column guide */}
-                  <line
-                    x1={tlX} y1={28} x2={tlX} y2={curH - 12}
-                    stroke={COLORS.border}
-                    strokeWidth={0.5}
-                    strokeDasharray="4 6"
-                    opacity={0.3}
-                  />
-                  <text
-                    x={tlX} y={18}
-                    textAnchor="middle"
-                    fill={COLORS.textMuted}
-                    fontSize={10}
-                    fontFamily="'JetBrains Mono', monospace"
-                    fontWeight={500}
-                    opacity={0.4}
-                  >
-                    Tech Lead
-                  </text>
-                  <text
-                    x={tlX} y={curH - 16}
-                    textAnchor="middle"
-                    fill={COLORS.textMuted}
-                    fontSize={9}
-                    fontFamily="'JetBrains Mono', monospace"
-                    opacity={0.3}
-                  >
-                    Role (not a level)
-                  </text>
-
-                  {/* Level path (horizontal line) */}
+                  {/* Main level path (horizontal line) */}
                   <path
                     d={levelPath}
                     stroke={COLORS.ic}
@@ -1247,36 +1244,103 @@ export default function CareerSpectrum() {
                     opacity={selected === "tech-lead" ? 0.15 : 0.6}
                   />
 
-                  {/* Branch path to Tech Lead */}
+                  {/* Tech Lead parallel line (detached - not connected to main track) */}
                   <path
                     d={tlPath}
                     stroke={TECH_LEAD_ROLE.color}
                     strokeWidth={3}
                     fill="none"
-                    opacity={selected && selected !== "tech-lead" && selected !== "cur-sr" ? 0.04 : 0.12}
+                    opacity={selected && selected !== "tech-lead" ? 0.04 : 0.12}
                   />
                   <path
                     d={tlPath}
                     stroke={TECH_LEAD_ROLE.color}
                     strokeWidth={1.5}
                     fill="none"
-                    opacity={selected && selected !== "tech-lead" && selected !== "cur-sr" ? 0.1 : 0.5}
+                    opacity={selected && selected !== "tech-lead" ? 0.15 : 0.5}
                     strokeDasharray="6 4"
                   />
 
-                  {/* "Role assigned" annotation */}
+                  {/* Tech Lead label on the line */}
                   <text
-                    x={(seniorX + tlX) / 2 + 15}
-                    y={(curMidY + tlY) / 2 - 8}
+                    x={(tlStartX + tlEndX) / 2}
+                    y={tlY - 12}
+                    textAnchor="middle"
+                    fill={TECH_LEAD_ROLE.color}
+                    fontSize={11}
+                    fontFamily="'DM Sans', sans-serif"
+                    fontWeight={600}
+                    opacity={selected && selected !== "tech-lead" ? 0.3 : 0.8}
+                  >
+                    Tech Lead
+                  </text>
+                  <text
+                    x={(tlStartX + tlEndX) / 2}
+                    y={tlY + 16}
                     textAnchor="middle"
                     fill={TECH_LEAD_ROLE.color}
                     fontSize={8}
                     fontFamily="'JetBrains Mono', monospace"
-                    opacity={0.4}
-                    transform={`rotate(-25, ${(seniorX + tlX) / 2 + 15}, ${(curMidY + tlY) / 2 - 8})`}
+                    opacity={selected && selected !== "tech-lead" ? 0.2 : 0.4}
                   >
-                    role assigned to sr+
+                    additional responsibilities (not a level)
                   </text>
+
+                  {/* Star markers along Tech Lead line - each with its own hover target */}
+                  {[tlStartX, (tlStartX + tlEndX) / 2, tlEndX - 40].map((x, i) => {
+                    const isActive = selected === "tech-lead" || hovered === "tech-lead";
+                    const isFaded = selected && selected !== "tech-lead";
+                    return (
+                      <g
+                        key={`tl-star-${i}`}
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={(e) => handleTLHover(e)}
+                        onMouseLeave={handleNodeLeave}
+                      >
+                        {/* Large invisible hover target for each node */}
+                        <circle
+                          cx={x} cy={tlY}
+                          r={25}
+                          fill="transparent"
+                        />
+                        {isActive && (
+                          <circle cx={x} cy={tlY} r={18} fill={TECH_LEAD_ROLE.color} opacity={0.12} filter="url(#curNodeGlow)" />
+                        )}
+                        <circle
+                          cx={x} cy={tlY}
+                          r={isActive ? 10 : (i === 1 ? 8 : 6)}
+                          fill={COLORS.surface}
+                          stroke={TECH_LEAD_ROLE.color}
+                          strokeWidth={isActive ? 2.5 : (i === 1 ? 2 : 1.5)}
+                          opacity={isFaded ? 0.3 : 1}
+                          style={{ transition: "all 0.15s ease" }}
+                        />
+                        <text
+                          x={x} y={tlY + 4}
+                          textAnchor="middle"
+                          fill={TECH_LEAD_ROLE.color}
+                          fontSize={i === 1 ? 10 : 8}
+                          fontFamily="'JetBrains Mono', monospace"
+                          fontWeight={600}
+                          opacity={isFaded ? 0.2 : 0.8}
+                        >
+                          ★
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Additional hover target covering the line between nodes */}
+                  <rect
+                    x={tlStartX}
+                    y={tlY - 20}
+                    width={tlEndX - tlStartX - 40}
+                    height={40}
+                    fill="transparent"
+                    style={{ cursor: "pointer" }}
+                    onMouseEnter={(e) => handleTLHover(e)}
+                    onMouseLeave={handleNodeLeave}
+                  />
 
                   {/* Level nodes */}
                   {CURRENT_NODES.map((node) => {
@@ -1323,54 +1387,6 @@ export default function CareerSpectrum() {
                     );
                   })}
 
-                  {/* Tech Lead node */}
-                  {(() => {
-                    const isActive = selected === "tech-lead" || hovered === "tech-lead";
-                    const isFaded = selected && selected !== "tech-lead";
-                    return (
-                      <g
-                        style={{ cursor: "pointer" }}
-                        onMouseEnter={(e) => handleTLHover(e)}
-                        onMouseLeave={handleNodeLeave}
-                      >
-                        {isActive && (
-                          <circle cx={tlX} cy={tlY} r={22} fill={TECH_LEAD_ROLE.color} opacity={0.12} filter="url(#curNodeGlow)" />
-                        )}
-                        <circle
-                          cx={tlX} cy={tlY}
-                          r={isActive ? 12 : 10}
-                          fill={COLORS.surface}
-                          stroke={TECH_LEAD_ROLE.color}
-                          strokeWidth={isActive ? 2.5 : 2}
-                          opacity={isFaded ? 0.3 : 1}
-                          style={{ transition: "all 0.15s ease" }}
-                        />
-                        <text
-                          x={tlX} y={tlY + 4}
-                          textAnchor="middle"
-                          fill={TECH_LEAD_ROLE.color}
-                          fontSize={10}
-                          fontFamily="'JetBrains Mono', monospace"
-                          fontWeight={600}
-                          opacity={isFaded ? 0.2 : 0.8}
-                        >
-                          ★
-                        </text>
-                        <text
-                          x={tlX} y={tlY - 20}
-                          textAnchor="middle"
-                          fill={isActive ? COLORS.textPrimary : COLORS.textSecondary}
-                          fontSize={12}
-                          fontWeight={600}
-                          fontFamily="'DM Sans', sans-serif"
-                          opacity={isFaded ? 0.3 : 1}
-                        >
-                          Tech Lead
-                        </text>
-                      </g>
-                    );
-                  })()}
-
                   {/* Scope arrow */}
                   <line x1={W * 0.02} y1={curH - 4} x2={W * 0.96} y2={curH - 4} stroke={COLORS.textMuted} strokeWidth={0.5} opacity={0.2} />
                   <polygon points={`${W * 0.96},${curH - 7} ${W * 0.98},${curH - 4} ${W * 0.96},${curH - 1}`} fill={COLORS.textMuted} opacity={0.2} />
@@ -1403,22 +1419,23 @@ export default function CareerSpectrum() {
                 Current Model
               </div>
               <p style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-                Engineers progress through three levels:{" "}
+                Engineers progress through five levels:{" "}
                 <span style={{ color: COLORS.ic }}>Junior</span>,{" "}
-                <span style={{ color: COLORS.ic }}>Mid-Level</span>, and{" "}
-                <span style={{ color: COLORS.ic }}>Senior</span> — all focused
-                purely on individual contribution. At senior and beyond, high-performing
-                engineers may be assigned the{" "}
-                <span style={{ color: TECH_LEAD_ROLE.color }}>Tech Lead</span> role — a
-                separate designation (not a level) that bundles delivery ownership,
-                technical decision-making, mentoring, and process responsibilities into
-                a single role. This means one person carries all the cross-cutting
-                leadership responsibilities, rather than having these skills develop
-                gradually across the senior spectrum. The{" "}
+                <span style={{ color: COLORS.ic }}>Mid-Level</span>,{" "}
+                <span style={{ color: COLORS.ic }}>Senior</span>,{" "}
+                <span style={{ color: COLORS.ic }}>Staff</span>, and{" "}
+                <span style={{ color: COLORS.ic }}>Principal</span>. Starting at Senior,
+                high-performing engineers may be assigned the{" "}
+                <span style={{ color: TECH_LEAD_ROLE.color }}>Tech Lead</span> role — shown
+                as a parallel track above the main progression. This is a designation
+                (not a level) that bundles delivery ownership, technical decision-making,
+                mentoring, and process responsibilities into a single role. An engineer
+                can be a Senior Tech Lead, Staff Tech Lead, or Principal Tech Lead — the
+                role travels alongside their level progression. The{" "}
                 <span style={{ color: COLORS.textPrimary }}>Future Vision</span> tab
                 shows how we plan to embed these responsibilities into the natural
                 progression from senior onward, so they develop organically rather than
-                landing all at once in a separate role.
+                landing all at once in a separate designation.
               </p>
             </div>
           )}
