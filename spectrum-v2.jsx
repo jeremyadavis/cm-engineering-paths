@@ -232,7 +232,71 @@ const BRANCH_Y_OFFSETS = {
   people: 2.8,
 };
 
+/* ── Current-State data ────────────────────────────────── */
+
+const CURRENT_PHASES = [
+  { id: "c0", x: 0.12, label: "Junior", sublabel: "Learning & Growing" },
+  { id: "c1", x: 0.35, label: "Mid-Level", sublabel: "Reliable Contributor" },
+  { id: "c2", x: 0.58, label: "Senior", sublabel: "Experienced IC" },
+];
+
+const CURRENT_NODES = [
+  {
+    id: "cur-jr", phase: 0,
+    title: "Junior Engineer",
+    items: [
+      "Completes well-defined tasks with guidance and support",
+      "Writes functional code and learns team conventions",
+      "Asks good questions — knows when to ask for help",
+      "Participates in PR reviews to learn",
+      "Developing familiarity with the codebase and tooling",
+    ],
+  },
+  {
+    id: "cur-mid", phase: 1,
+    title: "Mid-Level Engineer",
+    items: [
+      "Independently delivers well-scoped features",
+      "Writes clean, tested code following team standards",
+      "Gives substantive PR reviews",
+      "Debugs and resolves issues in their area",
+      "Understands the 'why' behind architectural choices",
+    ],
+  },
+  {
+    id: "cur-sr", phase: 2,
+    title: "Senior Engineer",
+    items: [
+      "Owns features end-to-end: design, implementation, testing, deployment",
+      "Produces thorough PR reviews that elevate code quality",
+      "Maintains quality standards for their area",
+      "Debugs and resolves production issues independently",
+      "Makes sound technical choices within their feature scope",
+    ],
+  },
+];
+
+const TECH_LEAD_ROLE = {
+  id: "tech-lead",
+  title: "Tech Lead",
+  subtitle: "Role assigned to Senior+ engineers",
+  color: "#c9865a",
+  items: [
+    "Owns scoping, sequencing, and delivery tracking for team projects",
+    "Coordinates across engineers on shared deliverables",
+    "Identifies and escalates delivery risks",
+    "Makes and documents technical decisions for the team",
+    "Balances short-term delivery vs. long-term maintainability",
+    "Facilitates design reviews and architectural discussions",
+    "Pairs with and mentors junior and mid-level engineers",
+    "Shares context and rationale to help others grow",
+    "Suggests and drives improvements to team workflows",
+    "Helps refine estimation, PR review, and incident response processes",
+  ],
+};
+
 export default function CareerSpectrum() {
+  const [activeTab, setActiveTab] = useState("future");
   const [selected, setSelected] = useState(null);
   const [hovered, setHovered] = useState(null);
   const [selectedTrack, setSelectedTrack] = useState(null);
@@ -367,6 +431,9 @@ export default function CareerSpectrum() {
   const trackData = buildTrackPaths();
   const selectedNode = NODES.find((n) => n.id === selected);
   const selectedTrackData = TRACKS.find((t) => t.id === selectedTrack);
+  const selectedCurrentNode = activeTab === "current"
+    ? (CURRENT_NODES.find((n) => n.id === selected) || (selected === "tech-lead" ? TECH_LEAD_ROLE : null))
+    : null;
 
   const isRelatedToTrack = (nodeId, trackId) => {
     if (!trackId) return false;
@@ -424,11 +491,11 @@ export default function CareerSpectrum() {
     if (!data) return null;
 
     const isNode = type === "node";
-    const color = isNode ? BRANCH_META[data.branch].color : data.color;
-    const icon = isNode ? BRANCH_META[data.branch].icon : null;
-    const label = isNode
-      ? `${BRANCH_META[data.branch].label} · ${PHASES[data.phase].sublabel}`
-      : "Distinct Track";
+    const color = data._color || (isNode ? BRANCH_META[data.branch]?.color : data.color) || COLORS.ic;
+    const icon = data._icon || (isNode ? BRANCH_META[data.branch]?.icon : null);
+    const label = data._label || (isNode
+      ? `${BRANCH_META[data.branch]?.label} · ${PHASES[data.phase]?.sublabel}`
+      : "Distinct Track");
 
     // Calculate modal position - position near the clicked element
     const modalStyle = {
@@ -517,11 +584,25 @@ export default function CareerSpectrum() {
       />
 
       {/* Modal for node/track details */}
-      {selectedNode && (
+      {selectedNode && activeTab === "future" && (
         <DetailModal data={selectedNode} type="node" onClose={() => setSelected(null)} />
       )}
-      {selectedTrackData && (
+      {selectedTrackData && activeTab === "future" && (
         <DetailModal data={selectedTrackData} type="track" onClose={() => setSelectedTrack(null)} />
+      )}
+      {selectedCurrentNode && activeTab === "current" && (
+        <DetailModal
+          data={{
+            ...selectedCurrentNode,
+            _color: selectedCurrentNode.id === "tech-lead" ? TECH_LEAD_ROLE.color : COLORS.ic,
+            _icon: selectedCurrentNode.id === "tech-lead" ? "★" : "◆",
+            _label: selectedCurrentNode.id === "tech-lead"
+              ? "Role · Senior+ Designation"
+              : `Engineering Level · ${CURRENT_PHASES[selectedCurrentNode.phase]?.sublabel || ""}`,
+          }}
+          type="node"
+          onClose={() => setSelected(null)}
+        />
       )}
 
       <div ref={containerRef} style={{ maxWidth: isFullscreen ? "none" : 1060, margin: "0 auto", padding: isFullscreen ? "0 20px" : 0 }}>
@@ -546,12 +627,46 @@ export default function CareerSpectrum() {
                 lineHeight: 1.5,
               }}
             >
-              From junior through senior, additional responsibilities emerge and
-              branch toward Staff or EM. Hover over any node to explore.
+              {activeTab === "future"
+                ? "From junior through senior, additional responsibilities emerge and branch toward Staff or EM. Hover over any node to explore."
+                : "Our current leveling structure with the Tech Lead role. Hover over any node to explore."}
             </p>
           </div>
         )}
 
+        {/* Tab navigation */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+          {[
+            { id: "current", label: "Current State" },
+            { id: "future", label: "Future Vision" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setSelected(null);
+                setSelectedTrack(null);
+                setHovered(null);
+              }}
+              style={{
+                padding: "8px 20px",
+                background: activeTab === tab.id ? COLORS.surfaceHover : "transparent",
+                border: `1px solid ${activeTab === tab.id ? COLORS.border : "transparent"}`,
+                borderRadius: 6,
+                color: activeTab === tab.id ? COLORS.textPrimary : COLORS.textMuted,
+                fontSize: 13,
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                fontFamily: "'DM Sans', sans-serif",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "future" && (<>
         {/* Legend and controls */}
         <div
           style={{
@@ -898,6 +1013,416 @@ export default function CareerSpectrum() {
           </p>
         </div>
         )}
+        </>)}
+
+        {/* ── Current State tab ───────────────────────────── */}
+        {activeTab === "current" && (<>
+          {/* Current state legend */}
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              marginBottom: 16,
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: COLORS.ic, fontSize: 10 }}>◆</span>
+                <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Engineering Levels
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: TECH_LEAD_ROLE.color, fontSize: 10 }}>★</span>
+                <span style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Tech Lead (Role)
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                background: COLORS.surfaceHover,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 6,
+                color: COLORS.textSecondary,
+                fontSize: 12,
+                fontFamily: "'JetBrains Mono', monospace",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = COLORS.border;
+                e.currentTarget.style.color = COLORS.textPrimary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = COLORS.surfaceHover;
+                e.currentTarget.style.color = COLORS.textSecondary;
+              }}
+              title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isFullscreen ? (
+                  <>
+                    <polyline points="4 14 10 14 10 20" />
+                    <polyline points="20 10 14 10 14 4" />
+                    <line x1="14" y1="10" x2="21" y2="3" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </>
+                ) : (
+                  <>
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </>
+                )}
+              </svg>
+              {isFullscreen ? "Exit" : "Expand"}
+            </button>
+          </div>
+
+          {/* Current State SVG */}
+          {(() => {
+            const curH = isFullscreen ? Math.max(400, window.innerHeight - 120) : 420;
+            const curMidY = curH * 0.5;
+            const curPhaseX = CURRENT_PHASES.map((p) => W * p.x);
+            const tlX = W * 0.82;
+            const tlY = curH * 0.22;
+
+            // Build paths
+            const levelPath = `M ${curPhaseX[0]} ${curMidY} L ${curPhaseX[1]} ${curMidY} L ${curPhaseX[2]} ${curMidY}`;
+            const seniorX = curPhaseX[2];
+            const cpX = seniorX + (tlX - seniorX) * 0.5;
+            const tlPath = `M ${seniorX} ${curMidY} C ${cpX} ${curMidY}, ${cpX} ${tlY}, ${tlX} ${tlY}`;
+
+            const handleCurrentNodeHover = (node, e) => {
+              setSelected(node.id);
+              setSelectedTrack(null);
+              setHovered(node.id);
+              if (svgContainerRef.current && e) {
+                const rect = svgContainerRef.current.getBoundingClientRect();
+                const nx = curPhaseX[node.phase];
+                const ny = curMidY;
+                const scaleX = rect.width / W;
+                const scaleY = rect.height / curH;
+                setModalPos({ x: rect.left + nx * scaleX, y: rect.top + ny * scaleY });
+              }
+            };
+
+            const handleTLHover = (e) => {
+              setSelected("tech-lead");
+              setSelectedTrack(null);
+              setHovered("tech-lead");
+              if (svgContainerRef.current && e) {
+                const rect = svgContainerRef.current.getBoundingClientRect();
+                const scaleX = rect.width / W;
+                const scaleY = rect.height / curH;
+                setModalPos({ x: rect.left + tlX * scaleX, y: rect.top + tlY * scaleY });
+              }
+            };
+
+            return (
+              <div
+                ref={svgContainerRef}
+                style={{
+                  background: COLORS.surface,
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  overflow: "hidden",
+                }}
+              >
+                <svg width="100%" viewBox={`0 0 ${W} ${curH}`} style={{ display: "block" }}>
+                  <defs>
+                    <filter id="curNodeGlow">
+                      <feGaussianBlur stdDeviation="6" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  {/* Subtle grid */}
+                  {Array.from({ length: Math.floor(W / 24) }).map((_, i) =>
+                    Array.from({ length: Math.floor(curH / 24) }).map((_, j) => (
+                      <circle
+                        key={`cg-${i}-${j}`}
+                        cx={i * 24 + 12}
+                        cy={j * 24 + 12}
+                        r={0.4}
+                        fill={COLORS.textMuted}
+                        opacity={0.12}
+                      />
+                    ))
+                  )}
+
+                  {/* Phase column guides */}
+                  {CURRENT_PHASES.map((p, i) => {
+                    const x = curPhaseX[i];
+                    return (
+                      <g key={p.id}>
+                        <line
+                          x1={x} y1={28} x2={x} y2={curH - 12}
+                          stroke={COLORS.border}
+                          strokeWidth={0.5}
+                          strokeDasharray="4 6"
+                          opacity={0.5}
+                        />
+                        <text
+                          x={x} y={18}
+                          textAnchor="middle"
+                          fill={COLORS.textMuted}
+                          fontSize={10}
+                          fontFamily="'JetBrains Mono', monospace"
+                          fontWeight={500}
+                          opacity={0.6}
+                        >
+                          {p.label}
+                        </text>
+                        <text
+                          x={x} y={curH - 16}
+                          textAnchor="middle"
+                          fill={COLORS.textMuted}
+                          fontSize={9}
+                          fontFamily="'JetBrains Mono', monospace"
+                          opacity={0.3}
+                        >
+                          {p.sublabel}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Tech Lead column guide */}
+                  <line
+                    x1={tlX} y1={28} x2={tlX} y2={curH - 12}
+                    stroke={COLORS.border}
+                    strokeWidth={0.5}
+                    strokeDasharray="4 6"
+                    opacity={0.3}
+                  />
+                  <text
+                    x={tlX} y={18}
+                    textAnchor="middle"
+                    fill={COLORS.textMuted}
+                    fontSize={10}
+                    fontFamily="'JetBrains Mono', monospace"
+                    fontWeight={500}
+                    opacity={0.4}
+                  >
+                    Tech Lead
+                  </text>
+                  <text
+                    x={tlX} y={curH - 16}
+                    textAnchor="middle"
+                    fill={COLORS.textMuted}
+                    fontSize={9}
+                    fontFamily="'JetBrains Mono', monospace"
+                    opacity={0.3}
+                  >
+                    Role (not a level)
+                  </text>
+
+                  {/* Level path (horizontal line) */}
+                  <path
+                    d={levelPath}
+                    stroke={COLORS.ic}
+                    strokeWidth={4}
+                    fill="none"
+                    opacity={selected === "tech-lead" ? 0.06 : 0.15}
+                  />
+                  <path
+                    d={levelPath}
+                    stroke={COLORS.ic}
+                    strokeWidth={1.5}
+                    fill="none"
+                    opacity={selected === "tech-lead" ? 0.15 : 0.6}
+                  />
+
+                  {/* Branch path to Tech Lead */}
+                  <path
+                    d={tlPath}
+                    stroke={TECH_LEAD_ROLE.color}
+                    strokeWidth={3}
+                    fill="none"
+                    opacity={selected && selected !== "tech-lead" && selected !== "cur-sr" ? 0.04 : 0.12}
+                  />
+                  <path
+                    d={tlPath}
+                    stroke={TECH_LEAD_ROLE.color}
+                    strokeWidth={1.5}
+                    fill="none"
+                    opacity={selected && selected !== "tech-lead" && selected !== "cur-sr" ? 0.1 : 0.5}
+                    strokeDasharray="6 4"
+                  />
+
+                  {/* "Role assigned" annotation */}
+                  <text
+                    x={(seniorX + tlX) / 2 + 15}
+                    y={(curMidY + tlY) / 2 - 8}
+                    textAnchor="middle"
+                    fill={TECH_LEAD_ROLE.color}
+                    fontSize={8}
+                    fontFamily="'JetBrains Mono', monospace"
+                    opacity={0.4}
+                    transform={`rotate(-25, ${(seniorX + tlX) / 2 + 15}, ${(curMidY + tlY) / 2 - 8})`}
+                  >
+                    role assigned to sr+
+                  </text>
+
+                  {/* Level nodes */}
+                  {CURRENT_NODES.map((node) => {
+                    const nx = curPhaseX[node.phase];
+                    const ny = curMidY;
+                    const isActive = selected === node.id || hovered === node.id;
+                    const isFaded = selected && selected !== node.id && selected !== "tech-lead";
+                    return (
+                      <g
+                        key={node.id}
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={(e) => handleCurrentNodeHover(node, e)}
+                        onMouseLeave={handleNodeLeave}
+                      >
+                        {isActive && (
+                          <circle cx={nx} cy={ny} r={18} fill={COLORS.ic} opacity={0.15} filter="url(#curNodeGlow)" />
+                        )}
+                        <circle
+                          cx={nx} cy={ny}
+                          r={isActive ? 9 : 7}
+                          fill={COLORS.surface}
+                          stroke={COLORS.ic}
+                          strokeWidth={isActive ? 2.5 : 1.5}
+                          opacity={isFaded ? 0.25 : 1}
+                          style={{ transition: "all 0.15s ease" }}
+                        />
+                        <circle
+                          cx={nx} cy={ny}
+                          r={2.5}
+                          fill={COLORS.ic}
+                          opacity={isFaded ? 0.15 : isActive ? 1 : 0.6}
+                        />
+                        <text
+                          x={nx} y={ny + 22}
+                          textAnchor="middle"
+                          fill={isActive ? COLORS.ic : COLORS.textMuted}
+                          fontSize={9}
+                          fontFamily="'JetBrains Mono', monospace"
+                          opacity={isFaded ? 0.2 : isActive ? 1 : 0.5}
+                        >
+                          {node.title}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Tech Lead node */}
+                  {(() => {
+                    const isActive = selected === "tech-lead" || hovered === "tech-lead";
+                    const isFaded = selected && selected !== "tech-lead";
+                    return (
+                      <g
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={(e) => handleTLHover(e)}
+                        onMouseLeave={handleNodeLeave}
+                      >
+                        {isActive && (
+                          <circle cx={tlX} cy={tlY} r={22} fill={TECH_LEAD_ROLE.color} opacity={0.12} filter="url(#curNodeGlow)" />
+                        )}
+                        <circle
+                          cx={tlX} cy={tlY}
+                          r={isActive ? 12 : 10}
+                          fill={COLORS.surface}
+                          stroke={TECH_LEAD_ROLE.color}
+                          strokeWidth={isActive ? 2.5 : 2}
+                          opacity={isFaded ? 0.3 : 1}
+                          style={{ transition: "all 0.15s ease" }}
+                        />
+                        <text
+                          x={tlX} y={tlY + 4}
+                          textAnchor="middle"
+                          fill={TECH_LEAD_ROLE.color}
+                          fontSize={10}
+                          fontFamily="'JetBrains Mono', monospace"
+                          fontWeight={600}
+                          opacity={isFaded ? 0.2 : 0.8}
+                        >
+                          ★
+                        </text>
+                        <text
+                          x={tlX} y={tlY - 20}
+                          textAnchor="middle"
+                          fill={isActive ? COLORS.textPrimary : COLORS.textSecondary}
+                          fontSize={12}
+                          fontWeight={600}
+                          fontFamily="'DM Sans', sans-serif"
+                          opacity={isFaded ? 0.3 : 1}
+                        >
+                          Tech Lead
+                        </text>
+                      </g>
+                    );
+                  })()}
+
+                  {/* Scope arrow */}
+                  <line x1={W * 0.02} y1={curH - 4} x2={W * 0.96} y2={curH - 4} stroke={COLORS.textMuted} strokeWidth={0.5} opacity={0.2} />
+                  <polygon points={`${W * 0.96},${curH - 7} ${W * 0.98},${curH - 4} ${W * 0.96},${curH - 1}`} fill={COLORS.textMuted} opacity={0.2} />
+                  <text x={W * 0.5} y={curH - 4} textAnchor="middle" fill={COLORS.textMuted} fontSize={8} fontFamily="'JetBrains Mono', monospace" opacity={0.3}>
+                    career progression →
+                  </text>
+                </svg>
+              </div>
+            );
+          })()}
+
+          {!isFullscreen && !selectedCurrentNode && (
+            <div style={{ textAlign: "center", padding: "20px 0 4px", color: COLORS.textMuted, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+              Hover over any node to see details · Press Expand for fullscreen view
+            </div>
+          )}
+
+          {/* Current State - How it works */}
+          {!isFullscreen && (
+            <div
+              style={{
+                marginTop: 28,
+                padding: "18px 22px",
+                background: COLORS.surface,
+                borderRadius: 10,
+                border: `1px solid ${COLORS.border}`,
+              }}
+            >
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: TECH_LEAD_ROLE.color, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+                Current Model
+              </div>
+              <p style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+                Engineers progress through three levels:{" "}
+                <span style={{ color: COLORS.ic }}>Junior</span>,{" "}
+                <span style={{ color: COLORS.ic }}>Mid-Level</span>, and{" "}
+                <span style={{ color: COLORS.ic }}>Senior</span> — all focused
+                purely on individual contribution. At senior and beyond, high-performing
+                engineers may be assigned the{" "}
+                <span style={{ color: TECH_LEAD_ROLE.color }}>Tech Lead</span> role — a
+                separate designation (not a level) that bundles delivery ownership,
+                technical decision-making, mentoring, and process responsibilities into
+                a single role. This means one person carries all the cross-cutting
+                leadership responsibilities, rather than having these skills develop
+                gradually across the senior spectrum. The{" "}
+                <span style={{ color: COLORS.textPrimary }}>Future Vision</span> tab
+                shows how we plan to embed these responsibilities into the natural
+                progression from senior onward, so they develop organically rather than
+                landing all at once in a separate role.
+              </p>
+            </div>
+          )}
+        </>)}
       </div>
     </div>
   );
